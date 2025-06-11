@@ -1,21 +1,46 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from helpers import back_substitution
+from preconditioners import jacobi, gauss_seidel, ilu0
 
-def getKrylov(A, V, H, j):
-    w = A @ V[j]
+
+def getKrylov(A, V, H, j, M_inv=None):
+
+    # Apply Preconditioning
+    if M_inv is not None:
+        w = M_inv @ A @ V[j]
+    else:
+        w = A @ V[j]
+
+    # Perform Krylov Iteration
     for i in range(j + 1):
         H[i, j] = np.dot(V[i], w)
         w -= H[i, j] * V[i]
     H[j + 1, j] = np.linalg.norm(w)
     if H[j + 1, j] != 0:
         V[j + 1] = w / H[j + 1, j]
+
     return V, H
 
-def GMRES(A, b, x0, m, tol, max_iterations=600):
+def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=600):
 
     n = A.shape[0]
     x = x0.copy()
+
+    if preconditioner:
+        if preconditioner == "jacobi":
+            M = jacobi(A)
+        elif preconditioner == "gauss_seidel":
+            M = gauss_seidel(A)
+        elif preconditioner == "ilu0":
+            M = ilu0(A)
+        else:
+            print(f"Preconditioner '{preconditioner}' not known")
+        
+        M_inv = np.linalg.inv(M) # TEMPORARY INVERSION
+        b = M_inv @ b
+    else: 
+        M_inv = None
 
     # Initial residual
     r = b - A @ x
@@ -52,7 +77,8 @@ def GMRES(A, b, x0, m, tol, max_iterations=600):
             iteration += 1
 
             # Arnoldi
-            V, H = getKrylov(A, V, H, j)
+
+            V, H = getKrylov(A, V, H, j, M_inv)
 
             # Apply previous Givens rotations
             for i in range(j):
