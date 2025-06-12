@@ -25,9 +25,9 @@ m = 600
 tol = 1e-8
 
 # Quick Check, if on the diagonal there are any zeros!
-A_diagonal_entries = np.diag(A)
-number_of_zeros = n - np.count_nonzero(A_diagonal_entries)
-print("Zeros:", number_of_zeros)
+# A_diagonal_entries = np.diag(A)
+# number_of_zeros = n - np.count_nonzero(A_diagonal_entries)
+# print("Zeros:", number_of_zeros)
 
 # Apply GMRES
 x_approx, errors = GMRES(
@@ -36,7 +36,7 @@ x_approx, errors = GMRES(
     x0,
     m,
     tol,
-    preconditioner="gauss_seidel",
+    preconditioner="ilu0",
     max_iterations=600)
 
 

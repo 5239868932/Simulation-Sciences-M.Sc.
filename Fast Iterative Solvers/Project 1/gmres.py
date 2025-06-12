@@ -4,13 +4,10 @@ from helpers import back_substitution
 from preconditioners import jacobi, gauss_seidel, ilu0
 
 
-def getKrylov(A, V, H, j, M_inv=None):
+def getKrylov(A, V, H, j, preconditioner, ilu0=False):
 
     # Apply Preconditioning
-    if M_inv is not None:
-        w = M_inv @ A @ V[j]
-    else:
-        w = A @ V[j]
+    w = preconditioner(A @ V[j])
 
     # Perform Krylov Iteration
     for i in range(j + 1):
@@ -30,17 +27,21 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=600):
     if preconditioner:
         if preconditioner == "jacobi":
             M = jacobi(A)
+            M_inv = np.linalg.inv(M)  # TEMPORARY INVERSION
+            apply_preconditioner = lambda v: M_inv @ v
         elif preconditioner == "gauss_seidel":
             M = gauss_seidel(A)
+            M_inv = np.linalg.inv(M)  # TEMPORARY INVERSION
+            apply_preconditioner = lambda v: M_inv @ v
         elif preconditioner == "ilu0":
-            M = ilu0(A)
+            L, U = ilu0(A)
+            apply_preconditioner = lambda v: np.linalg.solve(U, np.linalg.solve(L, v))
         else:
-            print(f"Preconditioner '{preconditioner}' not known")
-        
-        M_inv = np.linalg.inv(M) # TEMPORARY INVERSION
-        b = M_inv @ b
-    else: 
-        M_inv = None
+            raise ValueError(f"Preconditioner '{preconditioner}' not known")
+    else:
+        apply_preconditioner = lambda v: v  # Identity if no preconditioning
+    
+    b = apply_preconditioner(b)
 
     # Initial residual
     r = b - A @ x
@@ -78,7 +79,7 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=600):
 
             # Arnoldi
 
-            V, H = getKrylov(A, V, H, j, M_inv)
+            V, H = getKrylov(A, V, H, j, apply_preconditioner)
 
             # Apply previous Givens rotations
             for i in range(j):
