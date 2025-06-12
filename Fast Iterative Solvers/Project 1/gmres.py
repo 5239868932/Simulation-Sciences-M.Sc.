@@ -4,22 +4,30 @@ from helpers import back_substitution
 from preconditioners import jacobi, gauss_seidel, ilu0
 
 
-def getKrylov(A, V, H, j, preconditioner, ilu0=False):
+def getKrylov(A, V, H, j, preconditioner):
 
+    # In case of breakdown
+    V_break = V.copy()
+    H_break = H.copy()
     # Apply Preconditioning
     w = preconditioner(A @ V[j])
 
-    # Perform Krylov Iteration
+    # Perform Gram-Schmidt orthogonalization
     for i in range(j + 1):
         H[i, j] = np.dot(V[i], w)
         w -= H[i, j] * V[i]
+
     H[j + 1, j] = np.linalg.norm(w)
-    if H[j + 1, j] != 0:
-        V[j + 1] = w / H[j + 1, j]
 
-    return V, H
+    if H[j + 1, j] == 0:
+        # Breakdown: Krylov subspace has reached its maximum span
+        return V_break, H_break, True  # signal breakdown
 
-def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=600):
+    V[j + 1] = w / H[j + 1, j]
+
+    return V, H, False
+
+def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100):
 
     n = A.shape[0]
     x = x0.copy()
@@ -55,7 +63,14 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=600):
 
     iteration = 0  # Global iteration counter
 
+
+
+
     while iteration < max_iterations:
+
+        # Divergence Break
+        if max(global_errors) > 1e3: break
+
         # Step 1: Initialize inner GMRES storage
         V = np.zeros((m + 1, n))
         H = np.zeros((m + 1, m))
@@ -78,8 +93,20 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=600):
             iteration += 1
 
             # Arnoldi
+            V, H, breakdown = getKrylov(A, V, H, j, apply_preconditioner)
 
-            V, H = getKrylov(A, V, H, j, apply_preconditioner)
+            if breakdown:
+                # Calculate final estimate of x
+                y = back_substitution(H[:j, :j], e1[:j])
+                x = x + V[:j].T @ y
+
+                # Final relative residual after restart
+                r = b - A @ x
+                beta = np.linalg.norm(r)
+                rel_res = beta / r0_norm
+                global_errors.append(rel_res)
+
+                return x, global_errors
 
             # Apply previous Givens rotations
             for i in range(j):
@@ -93,7 +120,9 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=600):
             sn[j] = H[j + 1, j] / denom if denom != 0 else 0.0
 
             # Apply new Givens rotation
-            H[j, j] = cs[j] * H[j, j] + sn[j] * H[j + 1, j]
+            new_H = cs[j] * H[j, j] + sn[j] * H[j + 1, j]
+
+            H[j, j] = new_H
             H[j + 1, j] = 0.0
 
             # Update RHS vector
@@ -126,5 +155,56 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=600):
 
         if rel_res < tol:
             break
-
     return x, global_errors
+
+if __name__=="__main__":
+    # External Libraries
+    import os
+    import matplotlib.pyplot as plt
+    import numpy as np
+    # My Code
+    from gmres import GMRES
+    from msr_reader import msr_reader
+
+    # Paths
+    directory = os.getcwd() + "\\Fast Iterative Solvers\\Project 1\\matrices\\"
+    matrix_files = ["cg_matrix_msr_1.txt", # 0
+                    "cg_matrix_msr_2.txt", # 1
+                    "gmres_matrix_msr_1.txt", # 2
+                    "msr_test_non_symmetric.txt", # 3
+                    "msr_test_symmetric.txt"] # 4
+
+    # Read each matrix
+    matrices = []
+    for file in matrix_files:
+        path = directory + f"{file}"
+        matrices.append(msr_reader(path))
+    print("matrices read")
+        
+    # Types of preconditioning applied
+    preconditioners = [None,
+                      "jacobi",
+                      "gauss_seidel",
+                      "ilu0"]
+
+    # Further Specifications
+    A = matrices[2]
+    n = A.shape[0]
+    x = np.ones(n)
+    x0 = np.zeros(n)
+    b = A.dot(x)
+    tol = 1e-8
+
+    # Max number of Krylov vectors
+    ms = [10, 50, 200]
+
+    # Loop
+    results = []
+    for m in ms:
+        for preconditioner in preconditioners:
+            x_approx, errors = GMRES(A, b, x0, m, tol, preconditioner, max_iterations=1000)
+            if abs(errors[-1]) > 1:
+                print(f"Test: m={m}, prec={preconditioner} iterations={len(errors)} diverged")
+            else:
+                results.append(errors)
+                print(f"Test: m={m}, prec={preconditioner} iterations={len(errors)} ok")
