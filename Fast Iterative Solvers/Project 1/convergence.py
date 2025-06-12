@@ -16,19 +16,28 @@ path = path + f"\\Fast Iterative Solvers\\Project 1\\matrices\\{matrices[2]}"
 
 A = msr_reader(path)
 
-# # Preconditioning
-# from preconditioners import gauss_seidel
-# A = gauss_seidel
-
 # Setup up initial conditions
 n = A.shape[0]
 x = np.ones(n)
-x0 = np.zeros(n)
 b = A.dot(x)
+x0 = np.zeros(n)
 m = 600
 tol = 1e-8
 
-x_approx, errors = GMRES(A, b, x0, m, tol, max_iterations=600)
+# Quick Check, if on the diagonal there are any zeros!
+# A_diagonal_entries = np.diag(A)
+# number_of_zeros = n - np.count_nonzero(A_diagonal_entries)
+# print("Zeros:", number_of_zeros)
+
+# Apply GMRES
+x_approx, errors = GMRES(
+    A,
+    b,
+    x0,
+    m,
+    tol,
+    preconditioner="ilu0",
+    max_iterations=600)
 
 
 # Plot convergence
