@@ -27,7 +27,7 @@ def getKrylov(A, V, H, j, preconditioner):
 
     return V, H, False
 
-def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100):
+def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonality=False):
 
     n = A.shape[0]
     x = x0.copy()
