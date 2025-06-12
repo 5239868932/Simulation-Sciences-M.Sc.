@@ -1,1 +1,1 @@
-# empty
+print("Hello World")
