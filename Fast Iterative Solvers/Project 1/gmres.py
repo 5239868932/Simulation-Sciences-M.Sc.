@@ -31,8 +31,7 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
 
     n = A.shape[0]
     x = x0.copy()
-    if orthogonality:
-        dot_products = []
+    dot_products = []
 
     if preconditioner:
         if preconditioner == "jacobi":
