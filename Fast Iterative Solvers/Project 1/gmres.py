@@ -31,6 +31,8 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
 
     n = A.shape[0]
     x = x0.copy()
+    if orthogonality:
+        dot_products = []
 
     if preconditioner:
         if preconditioner == "jacobi":
@@ -105,8 +107,14 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
                 beta = np.linalg.norm(r)
                 rel_res = beta / r0_norm
                 global_errors.append(rel_res)
-
-                return x, global_errors
+                
+                if orthogonality:
+                    return x, dot_products
+                else:
+                    return x, global_errors
+            
+            # Calculate dot products (Orthogonal projection)
+            dot_products.append(V[0].dot(V[-1]))
 
             # Apply previous Givens rotations
             for i in range(j):
@@ -138,7 +146,10 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
             if current_rel_residual < tol:
                 y = back_substitution(H[:j + 1, :j + 1], e1[:j + 1])
                 x = x + V[:j + 1].T @ y
-                return x, global_errors
+                if orthogonality:
+                    return x, dot_products
+                else:
+                    return x, global_errors
 
             if iteration >= max_iterations:
                 break
@@ -155,7 +166,10 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
 
         if rel_res < tol:
             break
-    return x, global_errors
+    if orthogonality:
+        return x, dot_products
+    else:
+        return x, global_errors
 
 if __name__=="__main__":
     # External Libraries
