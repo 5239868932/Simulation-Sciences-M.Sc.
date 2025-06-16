@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from helpers import back_substitution
+from helpers import back_substitution, solve_upper_triangular, solve_lower_triangular
 from preconditioners import jacobi, gauss_seidel, ilu0
 
 
@@ -36,15 +36,14 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
     if preconditioner:
         if preconditioner == "jacobi":
             M = jacobi(A)
-            M_inv = np.linalg.inv(M)  # TEMPORARY INVERSION
-            apply_preconditioner = lambda v: M_inv @ v
+            apply_preconditioner = lambda v: solve_upper_triangular(M, v)
         elif preconditioner == "gauss_seidel":
             M = gauss_seidel(A)
             M_inv = np.linalg.inv(M)  # TEMPORARY INVERSION
-            apply_preconditioner = lambda v: M_inv @ v
+            apply_preconditioner = lambda v: solve_lower_triangular(M, v)
         elif preconditioner == "ilu0":
             L, U = ilu0(A)
-            apply_preconditioner = lambda v: np.linalg.solve(U, np.linalg.solve(L, v))
+            apply_preconditioner = lambda v: solve_upper_triangular(U, solve_lower_triangular(L, v))
         else:
             raise ValueError(f"Preconditioner '{preconditioner}' not known")
     else:
@@ -98,7 +97,7 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
 
             if breakdown:
                 # Calculate final estimate of x
-                y = back_substitution(H[:j, :j], e1[:j])
+                y = solve_upper_triangular(H[:j, :j], e1[:j])
                 x = x + V[:j].T @ y
 
                 # Final relative residual after restart
@@ -143,7 +142,7 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
 
             # Check convergence
             if current_rel_residual < tol:
-                y = back_substitution(H[:j + 1, :j + 1], e1[:j + 1])
+                y = solve_upper_triangular(H[:j + 1, :j + 1], e1[:j + 1])
                 x = x + V[:j + 1].T @ y
                 if orthogonality:
                     return x, dot_products
@@ -154,7 +153,7 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
                 break
 
         # End of cycle: update solution
-        y = back_substitution(H[:m, :m], e1[:m])
+        y = solve_upper_triangular(H[:m, :m], e1[:m])
         x = x + V[:m].T @ y
 
         # Final relative residual after restart
