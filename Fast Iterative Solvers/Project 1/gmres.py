@@ -113,7 +113,7 @@ def GMRES(A, b, x0, m, tol, preconditioner=None, max_iterations=100, orthogonali
                     return x, global_errors
             
             # Calculate dot products (Orthogonal projection)
-            dot_products.append(V[0].dot(V[-1]))
+            dot_products.append(V[0].dot(V[j+1]))
 
             # Apply previous Givens rotations
             for i in range(j):
